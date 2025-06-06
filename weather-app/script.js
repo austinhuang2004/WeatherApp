@@ -117,3 +117,128 @@ function getCurrentLocation() {
         document.getElementById('weatherDisplay').innerHTML = '<div class="error">Geolocation is not supported by this browser.</div>';
     }
 }
+
+async function getWeather() {
+    const locationInput = document.getElementById('location').value.trim();
+    if (!locationInput) {
+        document.getElementById('weatherDisplay').innerHTML = '<div class="error">Please enter a location.</div>';
+        return;
+    }
+
+    document.getElementById('weatherDisplay').innerHTML = '<p>Loading...</p>';
+
+    try {
+        const url = isLatLon(locationInput)
+            ? `https://api.openweathermap.org/data/2.5/forecast?lat=${locationInput.split(',')[0]}&lon=${locationInput.split(',')[1]}&appid=${apiKey}&units=metric`
+            : `https://api.openweathermap.org/data/2.5/forecast?q=${encodeURIComponent(locationInput)}&appid=${apiKey}&units=metric`;
+
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data.cod !== "200") throw new Error(data.message);
+
+        const current = data.list[0];
+        const weatherData = {
+            location: `${data.city.name}, ${data.city.country}`,
+            locationType: isLatLon(locationInput) ? "Coordinates" : "City",
+            current: {
+                temperature: Math.round(current.main.temp),
+                condition: current.weather[0].main.toLowerCase(),
+                description: current.weather[0].description,
+                humidity: current.main.humidity,
+                windSpeed: current.wind.speed,
+                pressure: current.main.pressure,
+                icon: weatherIcons[current.weather[0].main.toLowerCase()] || weatherIcons.default
+            },
+            forecast: data.list
+                .filter((entry, i) => i % 8 === 0)
+                .slice(0, 5)
+                .map(entry => ({
+                    date: entry.dt_txt.split(' ')[0],
+                    day: new Date(entry.dt_txt).toLocaleDateString('en-US', { weekday: 'short' }),
+                    condition: entry.weather[0].main.toLowerCase(),
+                    high: Math.round(entry.main.temp_max),
+                    low: Math.round(entry.main.temp_min),
+                    icon: weatherIcons[entry.weather[0].main.toLowerCase()] || weatherIcons.default
+                })),
+            dateRange: {
+                start: document.getElementById('startDate').value,
+                end: document.getElementById('endDate').value
+            },
+            timestamp: new Date().toISOString()
+        };
+
+        currentWeatherData = weatherData;
+        displayWeather(weatherData);
+
+    } catch (error) {
+        document.getElementById('weatherDisplay').innerHTML = `<div class="error">Error: ${error.message}</div>`;
+    }
+}
+
+// Display weather data
+function displayWeather(data) {
+    const weatherDisplay = document.getElementById('weatherDisplay');
+    
+    let html = `
+        <div class="weather-display">
+            <h3>Weather for ${data.location}</h3>
+            <div class="current-weather">
+                <div>
+                    <div class="weather-icon">${data.current.icon}</div>
+                    <div>${data.current.description}</div>
+                </div>
+                <div class="temperature">${data.current.temperature}°C</div>
+            </div>
+            
+            <div class="weather-details">
+                <div class="detail-item">
+                    <strong>Humidity</strong><br>
+                    ${data.current.humidity}%
+                </div>
+                <div class="detail-item">
+                    <strong>Wind Speed</strong><br>
+                    ${data.current.windSpeed} km/h
+                </div>
+                <div class="detail-item">
+                    <strong>Pressure</strong><br>
+                    ${data.current.pressure} hPa
+                </div>
+                <div class="detail-item">
+                    <strong>Location Type</strong><br>
+                    ${data.locationType}
+                </div>
+            </div>
+    `;
+
+    if (data.dateRange) {
+        html += `
+            <div style="margin-top: 15px; padding: 10px; background: rgba(255,255,255,0.1); border-radius: 8px;">
+                <strong>Date Range:</strong> ${data.dateRange.start} to ${data.dateRange.end}
+            </div>
+        `;
+    }
+
+    html += `
+            <h4 style="margin-top: 20px; margin-bottom: 10px;">5-Day Forecast</h4>
+            <div class="forecast-container">
+    `;
+
+    data.forecast.forEach(day => {
+        html += `
+            <div class="forecast-item">
+                <div><strong>${day.day}</strong></div>
+                <div>${day.icon}</div>
+                <div>${day.high}°/${day.low}°</div>
+                <div style="font-size: 0.8em;">${day.date}</div>
+            </div>
+        `;
+    });
+
+    html += `
+            </div>
+        </div>
+    `;
+
+    weatherDisplay.innerHTML = html;
+}
