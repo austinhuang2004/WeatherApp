@@ -1,5 +1,6 @@
-let currentWeatherData = null; 
-const apiKey = config.OPENWEATHER_API_KEY;
+let currentWeatherData = null;
+let editingRecordId = null;
+let db = null;
 
 // Weather icons
 const weatherIcons = {
@@ -31,7 +32,7 @@ async function initDatabase() {
         }
         
         console.log('Database initialized successfully');
-        loadRecords(); 
+        loadRecords();
     } catch (error) {
         console.error('Failed to initialize database:', error);
         alert('Database initialization failed. Please refresh the page.');
@@ -117,6 +118,8 @@ function getCurrentLocation() {
         document.getElementById('weatherDisplay').innerHTML = '<div class="error">Geolocation is not supported by this browser.</div>';
     }
 }
+
+const apiKey = config.OPENWEATHER_API_KEY;
 
 async function getWeather() {
     const locationInput = document.getElementById('location').value.trim();
@@ -597,5 +600,172 @@ function searchRecords() {
     } catch (error) {
         console.error('Error searching records:', error);
         document.getElementById('recordsContainer').innerHTML = '<p>Error searching records.</p>';
+    }
+}
+
+// Export Functions
+function exportData(format) {
+    if (!db) {
+        alert('Database not initialized');
+        return;
+    }
+
+    try {
+        // Get all records for export
+        const selectSQL = `SELECT * FROM weather_records ORDER BY created_at DESC`;
+        const stmt = db.prepare(selectSQL);
+        const records = [];
+        
+        while (stmt.step()) {
+            const row = stmt.getAsObject();
+            row.forecast = row.forecast_data ? JSON.parse(row.forecast_data) : [];
+            records.push(row);
+        }
+        stmt.free();
+
+        if (records.length === 0) {
+            alert('No data to export!');
+            return;
+        }
+
+        let content = '';
+        let filename = `weather_data_${new Date().toISOString().split('T')[0]}`;
+        let mimeType = 'text/plain';
+
+        switch (format) {
+            case 'json':
+                content = JSON.stringify(records, null, 2);
+                filename += '.json';
+                mimeType = 'application/json';
+                break;
+
+            case 'csv':
+                content = 'ID,Location,Temperature,Condition,Humidity,Wind Speed,Pressure,Date Range Start,Date Range End,Saved At\n';
+                records.forEach(record => {
+                    content += `${record.id},"${record.location}",${record.temperature},"${record.description}",${record.humidity},${record.wind_speed},${record.pressure},"${record.date_range_start || ''}","${record.date_range_end || ''}","${record.saved_at}"\n`;
+                });
+                filename += '.csv';
+                mimeType = 'text/csv';
+                break;
+
+            case 'xml':
+                content = '<?xml version="1.0" encoding="UTF-8"?>\n<weather_records>\n';
+                records.forEach(record => {
+                    content += `  <record id="${record.id}">\n`;
+                    content += `    <location>${record.location}</location>\n`;
+                    content += `    <temperature>${record.temperature}</temperature>\n`;
+                    content += `    <condition>${record.description}</condition>\n`;
+                    content += `    <humidity>${record.humidity}</humidity>\n`;
+                    content += `    <wind_speed>${record.wind_speed}</wind_speed>\n`;
+                    content += `    <pressure>${record.pressure}</pressure>\n`;
+                    if (record.date_range_start && record.date_range_end) {
+                        content += `    <date_range>\n`;
+                        content += `      <start>${record.date_range_start}</start>\n`;
+                        content += `      <end>${record.date_range_end}</end>\n`;
+                        content += `    </date_range>\n`;
+                    }
+                    content += `    <saved_at>${record.saved_at}</saved_at>\n`;
+                    content += `  </record>\n`;
+                });
+                content += '</weather_records>';
+                filename += '.xml';
+                mimeType = 'application/xml';
+                break;
+
+            case 'markdown':
+                content = '# Weather Data Export\n\n';
+                content += `Generated on: ${new Date().toLocaleString()}\n\n`;
+                records.forEach((record, index) => {
+                    content += `## Record ${index + 1}: ${record.location}\n\n`;
+                    content += `- **Temperature:** ${record.temperature}°C\n`;
+                    content += `- **Condition:** ${record.description}\n`;
+                    content += `- **Humidity:** ${record.humidity}%\n`;
+                    content += `- **Wind Speed:** ${record.wind_speed} km/h\n`;
+                    content += `- **Pressure:** ${record.pressure} hPa\n`;
+                    if (record.date_range_start && record.date_range_end) {
+                        content += `- **Date Range:** ${record.date_range_start} to ${record.date_range_end}\n`;
+                    }
+                    content += `- **Saved At:** ${new Date(record.saved_at).toLocaleString()}\n\n`;
+                });
+                filename += '.md';
+                mimeType = 'text/markdown';
+                break;
+
+            case 'pdf':
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                
+                doc.setFontSize(20);
+                doc.text('Weather Data Export', 20, 20);
+                
+                doc.setFontSize(12);
+                doc.text(`Generated on: ${new Date().toLocaleString()}`, 20, 35);
+                
+                let yPosition = 50;
+                const pageHeight = doc.internal.pageSize.height;
+                const margin = 20;
+                
+                records.forEach((record, index) => {
+                    if (yPosition > pageHeight - 60) {
+                        doc.addPage();
+                        yPosition = 20;
+                    }
+                    
+                    doc.setFontSize(14);
+                    doc.setFont(undefined, 'bold');
+                    doc.text(`Record ${index + 1}: ${record.location}`, margin, yPosition);
+                    yPosition += 10;
+                    
+                    doc.setFontSize(10);
+                    doc.setFont(undefined, 'normal');
+                    
+                    const details = [
+                        `Temperature: ${record.temperature}°C`,
+                        `Condition: ${record.description}`,
+                        `Humidity: ${record.humidity}%`,
+                        `Wind Speed: ${record.wind_speed} km/h`,
+                        `Pressure: ${record.pressure} hPa`
+                    ];
+                    
+                    if (record.date_range_start && record.date_range_end) {
+                        details.push(`Date Range: ${record.date_range_start} to ${record.date_range_end}`);
+                    }
+                    
+                    details.push(`Saved At: ${new Date(record.saved_at).toLocaleString()}`);
+                    
+                    details.forEach(detail => {
+                        doc.text(detail, margin + 5, yPosition);
+                        yPosition += 6;
+                    });
+                    
+                    yPosition += 10;
+                });
+                
+                doc.save(filename + '.pdf');
+                return;
+        }
+
+        // Create and download file
+        const blob = new Blob([content], { type: mimeType });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+
+    } catch (error) {
+        console.error('Error exporting data:', error);
+        alert('Error exporting data: ' + error.message);
+    }
+}
+
+// Close modal when clicking outside of it
+window.onclick = function(event) {
+    const modal = document.getElementById('infoModal');
+    if (event.target == modal) {
+        modal.style.display = "none";
     }
 }
