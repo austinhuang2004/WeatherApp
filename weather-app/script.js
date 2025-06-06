@@ -73,3 +73,47 @@ function saveDatabase() {
         localStorage.setItem('weatherDatabase', JSON.stringify(buffer));
     }
 }
+
+// Lat or lon checker
+function isLatLon(value) {
+    return /^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/.test(value);
+}
+
+// Initialize app
+document.addEventListener('DOMContentLoaded', async function() {
+    await initDatabase();
+    
+    const today = new Date();
+    const futureDate = new Date(today.getTime() + (5 * 24 * 60 * 60 * 1000));
+    document.getElementById('startDate').value = today.toISOString().split('T')[0];
+    document.getElementById('endDate').value = futureDate.toISOString().split('T')[0];
+});
+
+// Modal functions
+function openModal() {
+    document.getElementById('infoModal').style.display = 'block';
+}
+
+function closeModal() {
+    document.getElementById('infoModal').style.display = 'none';
+}
+
+// Geolocation
+function getCurrentLocation() {
+    if (navigator.geolocation) {
+        document.getElementById('weatherDisplay').innerHTML = '<div class="loader"></div><p>Getting your location...</p>';
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const lat = position.coords.latitude;
+                const lon = position.coords.longitude;
+                document.getElementById('location').value = `${lat},${lon}`;
+                getWeather();
+            },
+            (error) => {
+                document.getElementById('weatherDisplay').innerHTML = '<div class="error">Unable to get your location. Please enter manually.</div>';
+            }
+        );
+    } else {
+        document.getElementById('weatherDisplay').innerHTML = '<div class="error">Geolocation is not supported by this browser.</div>';
+    }
+}
