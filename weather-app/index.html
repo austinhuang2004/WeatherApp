@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Weather App - PM Accelerator</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🌤️ Weather App</h1>
+    </div>
+
+    <div class="main-content">
+      <div class="weather-section">
+        <h2>🌍 Weather Lookup</h2>
+        <div class="input-group">
+          <label for="location">Location (City, ZIP, Coordinates, or Landmark):</label>
+          <input type="text" id="location" placeholder="e.g., London, 34.05,-118.24" />
+        </div>
+        
+        <div class="input-group">
+          <label for="dateRange">Date Range (optional):</label>
+          <input type="date" id="startDate" style="width: 48%; margin-right: 4%" />
+          <input type="date" id="endDate" style="width: 48%" />
+        </div>
+
+        <button class="btn" onclick="getCurrentLocation()">📍 Use Current Location</button>
+        <button class="btn" onclick="getWeather()">🔍 Get Weather</button>
+        
+        <div id="weatherDisplay"></div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
