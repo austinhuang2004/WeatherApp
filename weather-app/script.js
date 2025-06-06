@@ -242,3 +242,360 @@ function displayWeather(data) {
 
     weatherDisplay.innerHTML = html;
 }
+
+// CRUD Operations with SQL
+// CREATE - Save weather data
+function saveWeatherData() {
+    if (!currentWeatherData) {
+        alert('Need to get the weather data first');
+        return;
+    }
+
+    if (!db) {
+        alert('Database not initialized');
+        return;
+    }
+
+    try {
+        const data = currentWeatherData;
+        const now = new Date().toISOString();
+
+        if (editingRecordId) {
+            // UPDATE existing record
+            const updateSQL = `
+                UPDATE weather_records SET
+                    location = ?,
+                    location_type = ?,
+                    temperature = ?,
+                    condition = ?,
+                    description = ?,
+                    humidity = ?,
+                    wind_speed = ?,
+                    pressure = ?,
+                    icon = ?,
+                    forecast_data = ?,
+                    date_range_start = ?,
+                    date_range_end = ?,
+                    timestamp = ?,
+                    saved_at = ?
+                WHERE id = ?
+            `;
+
+            db.run(updateSQL, [
+                data.location,
+                data.locationType,
+                data.current.temperature,
+                data.current.condition,
+                data.current.description,
+                data.current.humidity,
+                data.current.windSpeed,
+                data.current.pressure,
+                data.current.icon,
+                JSON.stringify(data.forecast),
+                data.dateRange?.start || null,
+                data.dateRange?.end || null,
+                data.timestamp,
+                now,
+                editingRecordId
+            ]);
+
+            editingRecordId = null;
+            document.getElementById('weatherDisplay').innerHTML += '<div class="success">Weather data updated successfully!</div>';
+        } else {
+            // INSERT new record
+            const insertSQL = `
+                INSERT INTO weather_records (
+                    location, location_type, temperature, condition, description,
+                    humidity, wind_speed, pressure, icon, forecast_data,
+                    date_range_start, date_range_end, timestamp, saved_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `;
+
+            db.run(insertSQL, [
+                data.location,
+                data.locationType,
+                data.current.temperature,
+                data.current.condition,
+                data.current.description,
+                data.current.humidity,
+                data.current.windSpeed,
+                data.current.pressure,
+                data.current.icon,
+                JSON.stringify(data.forecast),
+                data.dateRange?.start || null,
+                data.dateRange?.end || null,
+                data.timestamp,
+                now
+            ]);
+
+            document.getElementById('weatherDisplay').innerHTML += '<div class="success">Weather data saved successfully!</div>';
+        }
+
+        saveDatabase();
+        loadRecords();
+
+    } catch (error) {
+        console.error('Error saving weather data:', error);
+        alert('Error saving weather data: ' + error.message);
+    }
+}
+
+// READ - Load all records
+function loadRecords() {
+    if (!db) {
+        document.getElementById('recordsContainer').innerHTML = '<p>Database not initialized.</p>';
+        return;
+    }
+
+    try {
+        const selectSQL = `
+            SELECT * FROM weather_records 
+            ORDER BY created_at DESC
+        `;
+        
+        const stmt = db.prepare(selectSQL);
+        const records = [];
+        
+        while (stmt.step()) {
+            const row = stmt.getAsObject();
+            // Parse forecast data back to array
+            row.forecast = row.forecast_data ? JSON.parse(row.forecast_data) : [];
+            records.push(row);
+        }
+        stmt.free();
+
+        const container = document.getElementById('recordsContainer');
+
+        if (records.length === 0) {
+            container.innerHTML = '<p>No saved records found.</p>';
+            return;
+        }
+
+        let html = '';
+        records.forEach(record => {
+            const dateRange = record.date_range_start && record.date_range_end 
+                ? `<div>Date Range: ${record.date_range_start} to ${record.date_range_end}</div>` 
+                : '';
+
+            html += `
+                <div class="record-item">
+                    <div><strong>${record.icon} ${record.location}</strong></div>
+                    <div>Temperature: ${record.temperature}°C</div>
+                    <div>Condition: ${record.description}</div>
+                    <div>Saved: ${new Date(record.saved_at).toLocaleString()}</div>
+                    ${dateRange}
+                    <div class="record-actions">
+                        <button class="btn" onclick="editRecord(${record.id})">✏️ Edit</button>
+                        <button class="btn btn-danger" onclick="deleteRecord(${record.id})">🗑️ Delete</button>
+                        <button class="btn btn-secondary" onclick="viewRecord(${record.id})">👁️ View Details</button>
+                    </div>
+                </div>
+            `;
+        });
+
+        container.innerHTML = html;
+
+    } catch (error) {
+        console.error('Error loading records:', error);
+        document.getElementById('recordsContainer').innerHTML = '<p>Error loading records.</p>';
+    }
+}
+
+// READ - Get single record
+function getRecord(id) {
+    if (!db) return null;
+
+    try {
+        const selectSQL = `SELECT * FROM weather_records WHERE id = ?`;
+        const stmt = db.prepare(selectSQL);
+        stmt.bind([id]);
+        
+        if (stmt.step()) {
+            const record = stmt.getAsObject();
+            record.forecast = record.forecast_data ? JSON.parse(record.forecast_data) : [];
+            stmt.free();
+            return record;
+        }
+        stmt.free();
+        return null;
+
+    } catch (error) {
+        console.error('Error getting record:', error);
+        return null;
+    }
+}
+
+// UPDATE - Edit record
+function editRecord(id) {
+    const record = getRecord(id);
+    if (record) {
+        // Populate form fields
+        document.getElementById('location').value = record.location;
+        if (record.date_range_start && record.date_range_end) {
+            document.getElementById('startDate').value = record.date_range_start;
+            document.getElementById('endDate').value = record.date_range_end;
+        }
+
+        // Reconstruct weather data object
+        currentWeatherData = {
+            location: record.location,
+            locationType: record.location_type,
+            current: {
+                temperature: record.temperature,
+                condition: record.condition,
+                description: record.description,
+                humidity: record.humidity,
+                windSpeed: record.wind_speed,
+                pressure: record.pressure,
+                icon: record.icon
+            },
+            forecast: record.forecast,
+            dateRange: record.date_range_start && record.date_range_end ? {
+                start: record.date_range_start,
+                end: record.date_range_end
+            } : null,
+            timestamp: record.timestamp
+        };
+
+        editingRecordId = id;
+        displayWeather(currentWeatherData);
+        alert('Record loaded for editing. Make changes and click "Save to Database" to update.');
+    }
+}
+
+// DELETE - Delete single record
+function deleteRecord(id) {
+    if (!db) {
+        alert('Database not initialized');
+        return;
+    }
+
+    if (confirm('Are you sure you want to delete this record?')) {
+        try {
+            const deleteSQL = `DELETE FROM weather_records WHERE id = ?`;
+            db.run(deleteSQL, [id]);
+            saveDatabase();
+            loadRecords();
+        } catch (error) {
+            console.error('Error deleting record:', error);
+            alert('Error deleting record: ' + error.message);
+        }
+    }
+}
+
+// View record details
+function viewRecord(id) {
+    const record = getRecord(id);
+    if (record) {
+        // Reconstruct weather data object for display
+        const weatherData = {
+            location: record.location,
+            locationType: record.location_type,
+            current: {
+                temperature: record.temperature,
+                condition: record.condition,
+                description: record.description,
+                humidity: record.humidity,
+                windSpeed: record.wind_speed,
+                pressure: record.pressure,
+                icon: record.icon
+            },
+            forecast: record.forecast,
+            dateRange: record.date_range_start && record.date_range_end ? {
+                start: record.date_range_start,
+                end: record.date_range_end
+            } : null,
+            timestamp: record.timestamp
+        };
+        displayWeather(weatherData);
+    }
+}
+
+// DELETE ALL - Clear all records
+function clearRecords() {
+    if (!db) {
+        alert('Database not initialized');
+        return;
+    }
+
+    if (confirm('Are you sure you want to delete all records?')) {
+        try {
+            db.run(`DELETE FROM weather_records`);
+            saveDatabase();
+            loadRecords();
+            alert('All records deleted.');
+        } catch (error) {
+            console.error('Error clearing records:', error);
+            alert('Error clearing records: ' + error.message);
+        }
+    }
+}
+
+// Search records
+function searchRecords() {
+    if (!db) return;
+
+    const searchTerm = document.getElementById('searchRecords').value.toLowerCase();
+    
+    if (!searchTerm.trim()) {
+        loadRecords();
+        return;
+    }
+
+    try {
+        const searchSQL = `
+            SELECT * FROM weather_records 
+            WHERE LOWER(location) LIKE ? 
+               OR LOWER(description) LIKE ?
+               OR date_range_start LIKE ?
+               OR date_range_end LIKE ?
+            ORDER BY created_at DESC
+        `;
+        
+        const searchPattern = `%${searchTerm}%`;
+        const stmt = db.prepare(searchSQL);
+        stmt.bind([searchPattern, searchPattern, searchPattern, searchPattern]);
+        
+        const filteredRecords = [];
+        while (stmt.step()) {
+            const row = stmt.getAsObject();
+            row.forecast = row.forecast_data ? JSON.parse(row.forecast_data) : [];
+            filteredRecords.push(row);
+        }
+        stmt.free();
+
+        const container = document.getElementById('recordsContainer');
+        if (filteredRecords.length === 0) {
+            container.innerHTML = '<p>No records match your search.</p>';
+            return;
+        }
+
+        let html = '';
+        filteredRecords.forEach(record => {
+            const dateRange = record.date_range_start && record.date_range_end 
+                ? `<div>Date Range: ${record.date_range_start} to ${record.date_range_end}</div>` 
+                : '';
+
+            html += `
+                <div class="record-item">
+                    <div><strong>${record.icon} ${record.location}</strong></div>
+                    <div>Temperature: ${record.temperature}°C</div>
+                    <div>Condition: ${record.description}</div>
+                    <div>Saved: ${new Date(record.saved_at).toLocaleString()}</div>
+                    ${dateRange}
+                    <div class="record-actions">
+                        <button class="btn" onclick="editRecord(${record.id})">✏️ Edit</button>
+                        <button class="btn btn-danger" onclick="deleteRecord(${record.id})">🗑️ Delete</button>
+                        <button class="btn btn-secondary" onclick="viewRecord(${record.id})">👁️ View Details</button>
+                    </div>
+                </div>
+            `;
+        });
+
+        container.innerHTML = html;
+
+    } catch (error) {
+        console.error('Error searching records:', error);
+        document.getElementById('recordsContainer').innerHTML = '<p>Error searching records.</p>';
+    }
+}
