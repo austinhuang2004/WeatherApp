@@ -6,7 +6,7 @@
 
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #667eea 0%);
     min-height: 100vh;
     color: #333;
 }
@@ -99,7 +99,7 @@ body {
 }
 
 .edit-section {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg,#764ba2 100%);
     border-radius: 15px;
     padding: 25px;
     margin: 20px 0;
@@ -163,7 +163,7 @@ body {
 }
 
 .btn {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #667eea 100%);
     color: white;
     border: none;
     padding: 12px 24px;
@@ -190,7 +190,7 @@ body {
 .weather-display {
     margin-top: 20px;
     padding: 20px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #667eea 0%);
     color: white;
     border-radius: 15px;
     text-align: center;

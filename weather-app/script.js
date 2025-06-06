@@ -3,17 +3,22 @@ let editingRecordId = null;
 let db = null;
 
 // Weather icons
-const weatherIcons = {
-    'clear': '🌞',
-    'clouds': '☁️',
-    'rain': '🌧️',
-    'snow': '❄️',
-    'thunderstorm': '⛈️',
-    'drizzle': '🌦️',
-    'mist': '🌫️',
-    'fog': '🌫️',
-    'default': '🌤️'
+const weatherIconCodes = {
+    'clear': '01d',
+    'clouds': '02d', 
+    'rain': '10d',
+    'snow': '13d',
+    'thunderstorm': '11d',
+    'drizzle': '09d',
+    'mist': '50d',
+    'fog': '50d',
+    'default': '01d'
 };
+
+function getWeatherIconUrl(iconCode, size = '2x') {
+    const validIconCode = iconCode && iconCode.length >= 3 ? iconCode : '01d';
+    return `https://openweathermap.org/img/wn/${validIconCode}@${size}.png`;
+}
 
 // Initialize SQL.js database
 async function initDatabase() {
@@ -90,6 +95,44 @@ document.addEventListener('DOMContentLoaded', async function() {
     document.getElementById('endDate').value = futureDate.toISOString().split('T')[0];
 });
 
+// emoji keys
+function getIconKeyFromEmoji(emoji) {
+    for (const [key, value] of Object.entries(weatherIcons)) {
+        if (value === emoji) {
+            return key;
+        }
+    }
+    return 'default';
+}
+
+// icon selector
+function createIconSelector(selectedIcon = '01d') {
+    let html = '<select id="editIcon" class="form-control">';
+    
+    const iconOptions = [
+        { code: '01d', name: 'Clear Sky (Day)' },
+        { code: '01n', name: 'Clear Sky (Night)' },
+        { code: '02d', name: 'Few Clouds (Day)' },
+        { code: '02n', name: 'Few Clouds (Night)' },
+        { code: '03d', name: 'Scattered Clouds' },
+        { code: '04d', name: 'Broken Clouds' },
+        { code: '09d', name: 'Shower Rain' },
+        { code: '10d', name: 'Rain (Day)' },
+        { code: '10n', name: 'Rain (Night)' },
+        { code: '11d', name: 'Thunderstorm' },
+        { code: '13d', name: 'Snow' },
+        { code: '50d', name: 'Mist/Fog' }
+    ];
+    
+    iconOptions.forEach(option => {
+        const selected = option.code === selectedIcon ? 'selected' : '';
+        html += `<option value="${option.code}" ${selected}>${option.name}</option>`;
+    });
+    
+    html += '</select>';
+    return html;
+}
+
 // Modal functions
 function openModal() {
     document.getElementById('infoModal').style.display = 'block';
@@ -151,7 +194,7 @@ async function getWeather() {
                 humidity: current.main.humidity,
                 windSpeed: current.wind.speed,
                 pressure: current.main.pressure,
-                icon: weatherIcons[current.weather[0].main.toLowerCase()] || weatherIcons.default
+                icon: current.weather[0].icon
             },
             forecast: data.list
                 .filter((entry, i) => i % 8 === 0)
@@ -162,7 +205,7 @@ async function getWeather() {
                     condition: entry.weather[0].main.toLowerCase(),
                     high: Math.round(entry.main.temp_max),
                     low: Math.round(entry.main.temp_min),
-                    icon: weatherIcons[entry.weather[0].main.toLowerCase()] || weatherIcons.default
+                    icon: entry.weather[0].icon
                 })),
             dateRange: {
                 start: document.getElementById('startDate').value,
@@ -192,7 +235,9 @@ function displayWeather(data) {
             <h3>Weather for ${data.location}</h3>
             <div class="current-weather">
                 <div>
-                    <div class="weather-icon">${data.current.icon}</div>
+                    <div class="weather-icon">
+                        <img src="${getWeatherIconUrl(data.current.icon)}" alt="${data.current.description}" style="width: 50px; height: 50px;">
+                    </div>
                     <div>${data.current.description}</div>
                 </div>
                 <div class="temperature">${data.current.temperature}°C</div>
@@ -235,7 +280,7 @@ function displayWeather(data) {
         html += `
             <div class="forecast-item">
                 <div><strong>${day.day}</strong></div>
-                <div>${day.icon}</div>
+                <div><img src="${getWeatherIconUrl(day.icon)}" alt="weather" style="width: 30px; height: 30px;"></div>
                 <div>${day.high}°/${day.low}°</div>
                 <div style="font-size: 0.8em;">${day.date}</div>
             </div>
@@ -365,7 +410,6 @@ function loadRecords() {
         
         while (stmt.step()) {
             const row = stmt.getAsObject();
-            // Parse forecast data back to array
             row.forecast = row.forecast_data ? JSON.parse(row.forecast_data) : [];
             records.push(row);
         }
@@ -384,9 +428,12 @@ function loadRecords() {
                 ? `<div>Date Range: ${record.date_range_start} to ${record.date_range_end}</div>` 
                 : '';
 
+            const iconCode = record.icon || '01d';
+            const iconDisplay = `<img src="${getWeatherIconUrl(iconCode)}" alt="weather" style="width: 24px; height: 24px; vertical-align: middle;" onerror="this.src='${getWeatherIconUrl('01d')}'">`;
+
             html += `
                 <div class="record-item">
-                    <div><strong>${record.icon} ${record.location}</strong></div>
+                    <div><strong>${iconDisplay} ${record.location}</strong></div>
                     <div>Temperature: ${record.temperature}°C</div>
                     <div>Condition: ${record.description}</div>
                     <div>Saved: ${new Date(record.saved_at).toLocaleString()}</div>
@@ -447,6 +494,24 @@ function editRecord(id) {
     document.getElementById('editWindSpeed').value = record.wind_speed || '';
     document.getElementById('editPressure').value = record.pressure || '';
     
+    let iconContainer = document.getElementById('editIconContainer');
+    if (!iconContainer) {
+        const pressureGroup = document.getElementById('editPressure').parentElement;
+        const iconGroup = document.createElement('div');
+        iconGroup.className = 'input-group';
+        iconGroup.innerHTML = `
+            <label for="editIcon">Weather Icon:</label>
+            <div id="editIconContainer"></div>
+        `;
+        pressureGroup.parentNode.insertBefore(iconGroup, pressureGroup.nextSibling);
+        iconContainer = document.getElementById('editIconContainer');
+    }
+    
+    if (iconContainer) {
+        const currentIconCode = record.icon || '01d';
+        iconContainer.innerHTML = createIconSelector(currentIconCode);
+    }
+
     if (record.date_range_start) {
         document.getElementById('editStartDate').value = record.date_range_start;
     }
@@ -457,6 +522,7 @@ function editRecord(id) {
     editingRecordId = id;
     document.getElementById('editSection').scrollIntoView({ behavior: 'smooth' });
 }
+
 
 function updateRecord() {
     if (!editingRecordId || !db) {
@@ -473,6 +539,9 @@ function updateRecord() {
         const pressure = parseFloat(document.getElementById('editPressure').value);
         const startDate = document.getElementById('editStartDate').value;
         const endDate = document.getElementById('editEndDate').value;
+
+        const iconSelect = document.getElementById('editIcon');
+        const selectedIconCode = iconSelect ? iconSelect.value : '01d';
 
         if (!location || isNaN(temperature) || !condition || isNaN(humidity) || isNaN(windSpeed) || isNaN(pressure)) {
             alert('Please fill in all required fields with valid values');
@@ -492,6 +561,7 @@ function updateRecord() {
                 humidity = ?,
                 wind_speed = ?,
                 pressure = ?,
+                icon = ?,
                 date_range_start = ?,
                 date_range_end = ?,
                 saved_at = ?
@@ -505,6 +575,7 @@ function updateRecord() {
             humidity,
             windSpeed,
             pressure,
+            selectedIconCode,
             startDate || null,
             endDate || null,
             now,
@@ -651,9 +722,12 @@ function searchRecords() {
                 ? `<div>Date Range: ${record.date_range_start} to ${record.date_range_end}</div>` 
                 : '';
 
+            const iconCode = record.icon || '01d';
+            const iconDisplay = `<img src="${getWeatherIconUrl(iconCode)}" alt="weather" style="width: 24px; height: 24px; vertical-align: middle;" onerror="this.src='${getWeatherIconUrl('01d')}'">`;
+
             html += `
                 <div class="record-item">
-                    <div><strong>${record.icon} ${record.location}</strong></div>
+                    <div><strong>${iconDisplay} ${record.location}</strong></div>
                     <div>Temperature: ${record.temperature}°C</div>
                     <div>Condition: ${record.description}</div>
                     <div>Saved: ${new Date(record.saved_at).toLocaleString()}</div>
