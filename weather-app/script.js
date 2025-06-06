@@ -2,7 +2,7 @@ let currentWeatherData = null;
 let editingRecordId = null;
 let db = null;
 
-// Weather icons mapping - removed unused weatherIconCodes object
+// Weather icons mapping
 const ICON_OPTIONS = [
     { code: '01d', name: 'Clear Sky (Day)' },
     { code: '01n', name: 'Clear Sky (Night)' },
@@ -356,7 +356,7 @@ function loadRecords() {
     }
 }
 
-// Helper function to display records (reduces code duplication)
+// Helper function to display records
 function displayRecords(records) {
     const container = document.getElementById('recordsContainer');
 
