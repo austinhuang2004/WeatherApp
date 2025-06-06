@@ -98,6 +98,45 @@ body {
     box-shadow: 0 8px 32px rgba(0,0,0,0.1);
 }
 
+.edit-section {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 15px;
+    padding: 25px;
+    margin: 20px 0;
+    color: white;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.edit-section h2 {
+    color: white;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.edit-section .input-group {
+    margin-bottom: 15px;
+}
+
+.edit-section .input-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: white;
+}
+
+.edit-section .input-group input {
+    width: 100%;
+    padding: 10px;
+    border-radius: 8px;
+    border: none;
+    background: rgba(255, 255, 255, 0.9);
+    color: #333;
+}
+
+.edit-section .btn {
+    margin: 10px 5px 0 0;
+}
+
 .input-group {
     margin-bottom: 20px;
 }

@@ -427,43 +427,110 @@ function getRecord(id) {
         return null;
     }
 }
-
-// UPDATE - Edit record
 function editRecord(id) {
     const record = getRecord(id);
-    if (record) {
-        // Populate form fields
-        document.getElementById('location').value = record.location;
-        if (record.date_range_start && record.date_range_end) {
-            document.getElementById('startDate').value = record.date_range_start;
-            document.getElementById('endDate').value = record.date_range_end;
+    if (!record) {
+        alert('Record not found');
+        return;
+    }
+    
+    document.getElementById('editSection').style.display = 'block';
+    document.getElementById('editLocation').value = record.location || '';
+    document.getElementById('editTemperature').value = record.temperature || '';
+    document.getElementById('editCondition').value = record.description || '';
+    document.getElementById('editHumidity').value = record.humidity || '';
+    document.getElementById('editWindSpeed').value = record.wind_speed || '';
+    document.getElementById('editPressure').value = record.pressure || '';
+    
+    if (record.date_range_start) {
+        document.getElementById('editStartDate').value = record.date_range_start;
+    }
+    if (record.date_range_end) {
+        document.getElementById('editEndDate').value = record.date_range_end;
+    }
+    
+    editingRecordId = id;
+        document.getElementById('editSection').scrollIntoView({ behavior: 'smooth' });
+}
+
+function updateRecord() {
+    if (!editingRecordId || !db) {
+        alert('No record selected for editing or database not initialized');
+        return;
+    }
+
+    try {
+        const location = document.getElementById('editLocation').value.trim();
+        const temperature = parseFloat(document.getElementById('editTemperature').value);
+        const condition = document.getElementById('editCondition').value.trim();
+        const humidity = parseInt(document.getElementById('editHumidity').value);
+        const windSpeed = parseFloat(document.getElementById('editWindSpeed').value);
+        const pressure = parseFloat(document.getElementById('editPressure').value);
+        const startDate = document.getElementById('editStartDate').value;
+        const endDate = document.getElementById('editEndDate').value;
+
+        if (!location || isNaN(temperature) || !condition || isNaN(humidity) || isNaN(windSpeed) || isNaN(pressure)) {
+            alert('Please fill in all required fields with valid values');
+            return;
         }
 
-        // Reconstruct weather data object
-        currentWeatherData = {
-            location: record.location,
-            locationType: record.location_type,
-            current: {
-                temperature: record.temperature,
-                condition: record.condition,
-                description: record.description,
-                humidity: record.humidity,
-                windSpeed: record.wind_speed,
-                pressure: record.pressure,
-                icon: record.icon
-            },
-            forecast: record.forecast,
-            dateRange: record.date_range_start && record.date_range_end ? {
-                start: record.date_range_start,
-                end: record.date_range_end
-            } : null,
-            timestamp: record.timestamp
-        };
+        const currentRecord = getRecord(editingRecordId);
+        const forecastData = currentRecord ? currentRecord.forecast_data : '[]';
 
-        editingRecordId = id;
-        displayWeather(currentWeatherData);
-        alert('Record loaded for editing. Make changes and click "Save to Database" to update.');
+        const now = new Date().toISOString();
+
+        const updateSQL = `
+            UPDATE weather_records SET
+                location = ?,
+                temperature = ?,
+                description = ?,
+                humidity = ?,
+                wind_speed = ?,
+                pressure = ?,
+                date_range_start = ?,
+                date_range_end = ?,
+                saved_at = ?
+            WHERE id = ?
+        `;
+
+        db.run(updateSQL, [
+            location,
+            temperature,
+            condition,
+            humidity,
+            windSpeed,
+            pressure,
+            startDate || null,
+            endDate || null,
+            now,
+            editingRecordId
+        ]);
+
+        saveDatabase();
+        loadRecords();
+        cancelEdit();
+        
+        alert('Record updated successfully!');
+
+    } catch (error) {
+        console.error('Error updating record:', error);
+        alert('Error updating record: ' + error.message);
     }
+}
+
+// Cancel editing
+function cancelEdit() {
+    document.getElementById('editSection').style.display = 'none';
+    editingRecordId = null;
+    
+    document.getElementById('editLocation').value = '';
+    document.getElementById('editTemperature').value = '';
+    document.getElementById('editCondition').value = '';
+    document.getElementById('editHumidity').value = '';
+    document.getElementById('editWindSpeed').value = '';
+    document.getElementById('editPressure').value = '';
+    document.getElementById('editStartDate').value = '';
+    document.getElementById('editEndDate').value = '';
 }
 
 // DELETE - Delete single record

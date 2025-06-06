@@ -1,105 +1,119 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Weather App - PM Accelerator</title>
-  <link rel="stylesheet" href="style.css" />
-  <script src="config.js"></script>
-  <script src="your-main-script.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js" defer></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
-  <script src="script.js" defer></script>
-  <style>
-    .modal {
-      display: none; 
-      position: fixed;
-      z-index: 1000;
-      left: 0; top: 0;
-      width: 100%; height: 100%;
-      overflow: auto;
-      background-color: rgba(0,0,0,0.5);
-    }
-    .modal-content {
-      background-color: #fff;
-      margin: 10% auto;
-      padding: 20px;
-      border-radius: 8px;
-      max-width: 600px;
-      position: relative;
-    }
-    .close {
-      position: absolute;
-      right: 10px; top: 10px;
-      font-size: 24px;
-      font-weight: bold;
-      cursor: pointer;
-    }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Weather App - PM Accelerator</title>
+<link rel="stylesheet" href="style.css" />
+<script src="config.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+<script src="script.js" defer></script>
 </head>
 <body>
-  <button class="info-btn" onclick="openModal()">ℹ️</button>
+<button class="info-btn" onclick="openModal()">ℹ️</button>
 
-  <div id="infoModal" class="modal">
+<div id="infoModal" class="modal">
     <div class="modal-content">
-      <span class="close" onclick="closeModal()">&times;</span>
-      <h2>About PM Accelerator</h2>
-      <p>PM Accelerator is a US-based company with a global reach, focusing on AI learning and development. Their dynamic AI PM Bootcamp empowers the next generation of AI professionals through hands-on experience, mentorship, and real-world projects.</p>
-      <p><strong>Developer:</strong> Austin Huang</p>
-      <p><strong>LinkedIn:</strong> <a href="https://www.linkedin.com/school/pmaccelerator/" target="_blank" rel="noopener noreferrer">Product Manager Accelerator</a></p>
+    <span class="close" onclick="closeModal()">&times;</span>
+    <h2>About PM Accelerator</h2>
+    <p>PM Accelerator is a US-based company with a global reach, focusing on AI learning and development. Their dynamic AI PM Bootcamp empowers the next generation of AI professionals through hands-on experience, mentorship, and real-world projects.</p>
+    <p><strong>Developer:</strong> Austin Huang</p>
+    <p><strong>LinkedIn:</strong> <a href="https://www.linkedin.com/school/pmaccelerator/" target="_blank" rel="noopener noreferrer">Product Manager Accelerator</a></p>
     </div>
-  </div>
+</div>
 
-  <div class="container">
+<div class="container">
     <div class="header">
-      <h1>🌤️ Weather App</h1>
+    <h1>🌤️ Weather App</h1>
     </div>
 
     <div class="main-content">
-      <div class="weather-section">
+    <div class="weather-section">
         <h2>🌍 Weather Lookup</h2>
         <div class="input-group">
-          <label for="location">Location (City, ZIP, Coordinates, or Landmark):</label>
-          <input type="text" id="location" placeholder="" />
+        <label for="location">Location (City, ZIP, Coordinates, or Landmark):</label>
+        <input type="text" id="location" placeholder="" />
         </div>
 
         <div class="input-group">
-          <label for="dateRange">Date Range (optional):</label>
-          <input type="date" id="startDate" style="width: 48%; margin-right: 4%" />
-          <input type="date" id="endDate" style="width: 48%" />
+        <label for="dateRange">Date Range (optional):</label>
+        <input type="date" id="startDate" style="width: 48%; margin-right: 4%" />
+        <input type="date" id="endDate" style="width: 48%" />
         </div>
 
         <button class="btn" onclick="getCurrentLocation()">📍 Use Current Location</button>
         <button class="btn" onclick="getWeather()">🔍 Get Weather</button>
-        <button class="btn btn-secondary" onclick="saveWeatherData()">💾 Save to Database</button>
+        <button class="btn btn-secondary" onclick="saveWeatherData()" id="saveWeatherBtn" style="display: none;">💾 Save Weather Data</button>
 
         <div id="weatherDisplay"></div>
-      </div>
 
-      <div class="crud-section">
+        <div class="edit-section" id="editSection" style="display: none;">
+            <h2>✏️ Edit Weather Record</h2>
+            <div class="input-group">
+            <label for="editLocation">Location:</label>
+            <input type="text" id="editLocation" />
+            </div>
+            
+            <div class="input-group">
+            <label for="editTemperature">Temperature (°C):</label>
+            <input type="number" id="editTemperature" step="0.1" />
+            </div>
+            
+            <div class="input-group">
+            <label for="editCondition">Condition:</label>
+            <input type="text" id="editCondition" />
+            </div>
+            
+            <div class="input-group">
+            <label for="editHumidity">Humidity (%):</label>
+            <input type="number" id="editHumidity" min="0" max="100" />
+            </div>
+            
+            <div class="input-group">
+            <label for="editWindSpeed">Wind Speed (km/h):</label>
+            <input type="number" id="editWindSpeed" step="0.1" min="0" />
+            </div>
+            
+            <div class="input-group">
+            <label for="editPressure">Pressure (hPa):</label>
+            <input type="number" id="editPressure" step="0.1" min="0" />
+            </div>
+            
+            <div class="input-group">
+            <label for="editDateRange">Date Range:</label>
+            <input type="date" id="editStartDate" style="width: 48%; margin-right: 4%" />
+            <input type="date" id="editEndDate" style="width: 48%" />
+            </div>
+            
+            <button class="btn" onclick="updateRecord()">💾 Update Record</button>
+            <button class="btn btn-secondary" onclick="cancelEdit()">❌ Cancel</button>
+        </div>
+    </div>
+
+    <div class="crud-section">
         <h2>🗃️ Saved Weather Records</h2>
 
         <div class="input-group">
-          <label for="searchRecords">Search Records:</label>
-          <input type="text" id="searchRecords" placeholder="Search by location or date" onkeyup="searchRecords()" />
+        <label for="searchRecords">Search Records:</label>
+        <input type="text" id="searchRecords" placeholder="Search by location or date" onkeyup="searchRecords()" />
         </div>
 
-        <button class="btn" onclick="loadRecords()">📋 Load All Records</button>
         <button class="btn btn-secondary" onclick="clearRecords()">🗑️ Clear All Records</button>
 
         <div id="recordsContainer" class="records-container"></div>
-      </div>
+    </div>
     </div>
 
     <div class="export-section">
-      <h2>📤 Data Export</h2>
-      <p>Export your saved weather data in various formats:</p>
-      <button class="btn" onclick="exportData('json')">📄 Export JSON</button>
-      <button class="btn" onclick="exportData('csv')">📊 Export CSV</button>
-      <button class="btn" onclick="exportData('xml')">🏷️ Export XML</button>
-      <button class="btn" onclick="exportData('pdf')">📕 Export PDF</button>
-      <button class="btn" onclick="exportData('markdown')">📝 Export Markdown</button>
+    <h2>📤 Data Export</h2>
+    <p>Export your saved weather data in various formats:</p>
+    <button class="btn" onclick="exportData('json')">📄 Export JSON</button>
+    <button class="btn" onclick="exportData('csv')">📊 Export CSV</button>
+    <button class="btn" onclick="exportData('xml')">🏷️ Export XML</button>
+    <button class="btn" onclick="exportData('pdf')">📕 Export PDF</button>
+    <button class="btn" onclick="exportData('markdown')">📝 Export Markdown</button>
     </div>
-  </div>
+</div>
 </body>
 </html>
