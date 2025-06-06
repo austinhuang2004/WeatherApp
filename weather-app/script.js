@@ -1,6 +1,6 @@
 let currentWeatherData = null; 
 
-// Weather icons for visual representation
+// Weather icons
 const weatherIcons = {
     'clear': '🌞',
     'clouds': '☁️',
@@ -12,3 +12,5 @@ const weatherIcons = {
     'fog': '🌫️',
     'default': '🌤️'
 };
+
+const apiKey = config.OPENWEATHER_API_KEY;
