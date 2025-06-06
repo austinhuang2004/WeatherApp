@@ -173,9 +173,13 @@ async function getWeather() {
 
         currentWeatherData = weatherData;
         displayWeather(weatherData);
+        
+        document.getElementById('saveWeatherBtn').style.display = 'inline-block';
 
     } catch (error) {
         document.getElementById('weatherDisplay').innerHTML = `<div class="error">Error: ${error.message}</div>`;
+        // Hide save button on error
+        document.getElementById('saveWeatherBtn').style.display = 'none';
     }
 }
 
@@ -250,7 +254,7 @@ function displayWeather(data) {
 // CREATE - Save weather data
 function saveWeatherData() {
     if (!currentWeatherData) {
-        alert('Need to get the weather data first');
+        alert('No weather data to save. Please get weather data first.');
         return;
     }
 
@@ -303,7 +307,7 @@ function saveWeatherData() {
             ]);
 
             editingRecordId = null;
-            document.getElementById('weatherDisplay').innerHTML += '<div class="success">Weather data updated successfully!</div>';
+            alert('Weather data updated successfully!');
         } else {
             // INSERT new record
             const insertSQL = `
@@ -331,12 +335,12 @@ function saveWeatherData() {
                 now
             ]);
 
-            document.getElementById('weatherDisplay').innerHTML += '<div class="success">Weather data saved successfully!</div>';
+            alert('Weather data saved successfully!');
         }
 
         saveDatabase();
         loadRecords();
-
+        
     } catch (error) {
         console.error('Error saving weather data:', error);
         alert('Error saving weather data: ' + error.message);
@@ -427,6 +431,7 @@ function getRecord(id) {
         return null;
     }
 }
+
 function editRecord(id) {
     const record = getRecord(id);
     if (!record) {
@@ -450,7 +455,7 @@ function editRecord(id) {
     }
     
     editingRecordId = id;
-        document.getElementById('editSection').scrollIntoView({ behavior: 'smooth' });
+    document.getElementById('editSection').scrollIntoView({ behavior: 'smooth' });
 }
 
 function updateRecord() {
