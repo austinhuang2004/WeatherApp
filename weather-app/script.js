@@ -2,25 +2,33 @@ let currentWeatherData = null;
 let editingRecordId = null;
 let db = null;
 
-// Weather icons
-const weatherIconCodes = {
-    'clear': '01d',
-    'clouds': '02d', 
-    'rain': '10d',
-    'snow': '13d',
-    'thunderstorm': '11d',
-    'drizzle': '09d',
-    'mist': '50d',
-    'fog': '50d',
-    'default': '01d'
-};
+// Weather icons mapping - removed unused weatherIconCodes object
+const ICON_OPTIONS = [
+    { code: '01d', name: 'Clear Sky (Day)' },
+    { code: '01n', name: 'Clear Sky (Night)' },
+    { code: '02d', name: 'Few Clouds (Day)' },
+    { code: '02n', name: 'Few Clouds (Night)' },
+    { code: '03d', name: 'Scattered Clouds' },
+    { code: '04d', name: 'Broken Clouds' },
+    { code: '09d', name: 'Shower Rain' },
+    { code: '10d', name: 'Rain (Day)' },
+    { code: '10n', name: 'Rain (Night)' },
+    { code: '11d', name: 'Thunderstorm' },
+    { code: '13d', name: 'Snow' },
+    { code: '50d', name: 'Mist/Fog' }
+];
 
+// Utility functions
 function getWeatherIconUrl(iconCode, size = '2x') {
     const validIconCode = iconCode && iconCode.length >= 3 ? iconCode : '01d';
     return `https://openweathermap.org/img/wn/${validIconCode}@${size}.png`;
 }
 
-// Initialize SQL.js database
+function isLatLon(value) {
+    return /^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/.test(value);
+}
+
+// Database operations
 async function initDatabase() {
     try {
         const SQL = await initSqlJs({
@@ -44,7 +52,6 @@ async function initDatabase() {
     }
 }
 
-// Create database tables
 function createTables() {
     const createTableSQL = `
         CREATE TABLE IF NOT EXISTS weather_records (
@@ -58,7 +65,7 @@ function createTables() {
             wind_speed REAL,
             pressure REAL,
             icon TEXT,
-            forecast_data TEXT, -- JSON string for forecast array
+            forecast_data TEXT,
             date_range_start TEXT,
             date_range_end TEXT,
             timestamp TEXT,
@@ -71,18 +78,12 @@ function createTables() {
     saveDatabase();
 }
 
-// Save database to localStorage
 function saveDatabase() {
     if (db) {
         const data = db.export();
         const buffer = Array.from(data);
         localStorage.setItem('weatherDatabase', JSON.stringify(buffer));
     }
-}
-
-// Lat or lon checker
-function isLatLon(value) {
-    return /^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/.test(value);
 }
 
 // Initialize app
@@ -95,36 +96,11 @@ document.addEventListener('DOMContentLoaded', async function() {
     document.getElementById('endDate').value = futureDate.toISOString().split('T')[0];
 });
 
-// emoji keys
-function getIconKeyFromEmoji(emoji) {
-    for (const [key, value] of Object.entries(weatherIcons)) {
-        if (value === emoji) {
-            return key;
-        }
-    }
-    return 'default';
-}
-
-// icon selector
+// UI functions
 function createIconSelector(selectedIcon = '01d') {
     let html = '<select id="editIcon" class="form-control">';
     
-    const iconOptions = [
-        { code: '01d', name: 'Clear Sky (Day)' },
-        { code: '01n', name: 'Clear Sky (Night)' },
-        { code: '02d', name: 'Few Clouds (Day)' },
-        { code: '02n', name: 'Few Clouds (Night)' },
-        { code: '03d', name: 'Scattered Clouds' },
-        { code: '04d', name: 'Broken Clouds' },
-        { code: '09d', name: 'Shower Rain' },
-        { code: '10d', name: 'Rain (Day)' },
-        { code: '10n', name: 'Rain (Night)' },
-        { code: '11d', name: 'Thunderstorm' },
-        { code: '13d', name: 'Snow' },
-        { code: '50d', name: 'Mist/Fog' }
-    ];
-    
-    iconOptions.forEach(option => {
+    ICON_OPTIONS.forEach(option => {
         const selected = option.code === selectedIcon ? 'selected' : '';
         html += `<option value="${option.code}" ${selected}>${option.name}</option>`;
     });
@@ -133,7 +109,6 @@ function createIconSelector(selectedIcon = '01d') {
     return html;
 }
 
-// Modal functions
 function openModal() {
     document.getElementById('infoModal').style.display = 'block';
 }
@@ -142,26 +117,27 @@ function closeModal() {
     document.getElementById('infoModal').style.display = 'none';
 }
 
-// Geolocation
 function getCurrentLocation() {
-    if (navigator.geolocation) {
-        document.getElementById('weatherDisplay').innerHTML = '<div class="loader"></div><p>Getting your location...</p>';
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const lat = position.coords.latitude;
-                const lon = position.coords.longitude;
-                document.getElementById('location').value = `${lat},${lon}`;
-                getWeather();
-            },
-            (error) => {
-                document.getElementById('weatherDisplay').innerHTML = '<div class="error">Unable to get your location. Please enter manually.</div>';
-            }
-        );
-    } else {
+    if (!navigator.geolocation) {
         document.getElementById('weatherDisplay').innerHTML = '<div class="error">Geolocation is not supported by this browser.</div>';
+        return;
     }
+    
+    document.getElementById('weatherDisplay').innerHTML = '<div class="loader"></div><p>Getting your location...</p>';
+    navigator.geolocation.getCurrentPosition(
+        (position) => {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+            document.getElementById('location').value = `${lat},${lon}`;
+            getWeather();
+        },
+        (error) => {
+            document.getElementById('weatherDisplay').innerHTML = '<div class="error">Unable to get your location. Please enter manually.</div>';
+        }
+    );
 }
 
+// Weather API functions
 const apiKey = config.OPENWEATHER_API_KEY;
 
 async function getWeather() {
@@ -221,12 +197,10 @@ async function getWeather() {
 
     } catch (error) {
         document.getElementById('weatherDisplay').innerHTML = `<div class="error">Error: ${error.message}</div>`;
-        // Hide save button on error
         document.getElementById('saveWeatherBtn').style.display = 'none';
     }
 }
 
-// Display weather data
 function displayWeather(data) {
     const weatherDisplay = document.getElementById('weatherDisplay');
     
@@ -287,16 +261,11 @@ function displayWeather(data) {
         `;
     });
 
-    html += `
-            </div>
-        </div>
-    `;
-
+    html += `</div></div>`;
     weatherDisplay.innerHTML = html;
 }
 
-// CRUD Operations with SQL
-// CREATE - Save weather data
+// CRUD Operations
 function saveWeatherData() {
     if (!currentWeatherData) {
         alert('No weather data to save. Please get weather data first.');
@@ -316,38 +285,17 @@ function saveWeatherData() {
             // UPDATE existing record
             const updateSQL = `
                 UPDATE weather_records SET
-                    location = ?,
-                    location_type = ?,
-                    temperature = ?,
-                    condition = ?,
-                    description = ?,
-                    humidity = ?,
-                    wind_speed = ?,
-                    pressure = ?,
-                    icon = ?,
-                    forecast_data = ?,
-                    date_range_start = ?,
-                    date_range_end = ?,
-                    timestamp = ?,
-                    saved_at = ?
+                    location = ?, location_type = ?, temperature = ?, condition = ?, description = ?,
+                    humidity = ?, wind_speed = ?, pressure = ?, icon = ?, forecast_data = ?,
+                    date_range_start = ?, date_range_end = ?, timestamp = ?, saved_at = ?
                 WHERE id = ?
             `;
 
             db.run(updateSQL, [
-                data.location,
-                data.locationType,
-                data.current.temperature,
-                data.current.condition,
-                data.current.description,
-                data.current.humidity,
-                data.current.windSpeed,
-                data.current.pressure,
-                data.current.icon,
-                JSON.stringify(data.forecast),
-                data.dateRange?.start || null,
-                data.dateRange?.end || null,
-                data.timestamp,
-                now,
+                data.location, data.locationType, data.current.temperature, data.current.condition,
+                data.current.description, data.current.humidity, data.current.windSpeed,
+                data.current.pressure, data.current.icon, JSON.stringify(data.forecast),
+                data.dateRange?.start || null, data.dateRange?.end || null, data.timestamp, now,
                 editingRecordId
             ]);
 
@@ -364,20 +312,10 @@ function saveWeatherData() {
             `;
 
             db.run(insertSQL, [
-                data.location,
-                data.locationType,
-                data.current.temperature,
-                data.current.condition,
-                data.current.description,
-                data.current.humidity,
-                data.current.windSpeed,
-                data.current.pressure,
-                data.current.icon,
-                JSON.stringify(data.forecast),
-                data.dateRange?.start || null,
-                data.dateRange?.end || null,
-                data.timestamp,
-                now
+                data.location, data.locationType, data.current.temperature, data.current.condition,
+                data.current.description, data.current.humidity, data.current.windSpeed,
+                data.current.pressure, data.current.icon, JSON.stringify(data.forecast),
+                data.dateRange?.start || null, data.dateRange?.end || null, data.timestamp, now
             ]);
 
             alert('Weather data saved successfully!');
@@ -392,7 +330,6 @@ function saveWeatherData() {
     }
 }
 
-// READ - Load all records
 function loadRecords() {
     if (!db) {
         document.getElementById('recordsContainer').innerHTML = '<p>Database not initialized.</p>';
@@ -400,11 +337,7 @@ function loadRecords() {
     }
 
     try {
-        const selectSQL = `
-            SELECT * FROM weather_records 
-            ORDER BY created_at DESC
-        `;
-        
+        const selectSQL = `SELECT * FROM weather_records ORDER BY created_at DESC`;
         const stmt = db.prepare(selectSQL);
         const records = [];
         
@@ -415,39 +348,7 @@ function loadRecords() {
         }
         stmt.free();
 
-        const container = document.getElementById('recordsContainer');
-
-        if (records.length === 0) {
-            container.innerHTML = '<p>No saved records found.</p>';
-            return;
-        }
-
-        let html = '';
-        records.forEach(record => {
-            const dateRange = record.date_range_start && record.date_range_end 
-                ? `<div>Date Range: ${record.date_range_start} to ${record.date_range_end}</div>` 
-                : '';
-
-            const iconCode = record.icon || '01d';
-            const iconDisplay = `<img src="${getWeatherIconUrl(iconCode)}" alt="weather" style="width: 24px; height: 24px; vertical-align: middle;" onerror="this.src='${getWeatherIconUrl('01d')}'">`;
-
-            html += `
-                <div class="record-item">
-                    <div><strong>${iconDisplay} ${record.location}</strong></div>
-                    <div>Temperature: ${record.temperature}°C</div>
-                    <div>Condition: ${record.description}</div>
-                    <div>Saved: ${new Date(record.saved_at).toLocaleString()}</div>
-                    ${dateRange}
-                    <div class="record-actions">
-                        <button class="btn" onclick="editRecord(${record.id})">✏️ Edit</button>
-                        <button class="btn btn-danger" onclick="deleteRecord(${record.id})">🗑️ Delete</button>
-                        <button class="btn btn-secondary" onclick="viewRecord(${record.id})">👁️ View Details</button>
-                    </div>
-                </div>
-            `;
-        });
-
-        container.innerHTML = html;
+        displayRecords(records);
 
     } catch (error) {
         console.error('Error loading records:', error);
@@ -455,7 +356,43 @@ function loadRecords() {
     }
 }
 
-// READ - Get single record
+// Helper function to display records (reduces code duplication)
+function displayRecords(records) {
+    const container = document.getElementById('recordsContainer');
+
+    if (records.length === 0) {
+        container.innerHTML = '<p>No saved records found.</p>';
+        return;
+    }
+
+    let html = '';
+    records.forEach(record => {
+        const dateRange = record.date_range_start && record.date_range_end 
+            ? `<div>Date Range: ${record.date_range_start} to ${record.date_range_end}</div>` 
+            : '';
+
+        const iconCode = record.icon || '01d';
+        const iconDisplay = `<img src="${getWeatherIconUrl(iconCode)}" alt="weather" style="width: 24px; height: 24px; vertical-align: middle;" onerror="this.src='${getWeatherIconUrl('01d')}'">`;
+
+        html += `
+            <div class="record-item">
+                <div><strong>${iconDisplay} ${record.location}</strong></div>
+                <div>Temperature: ${record.temperature}°C</div>
+                <div>Condition: ${record.description}</div>
+                <div>Saved: ${new Date(record.saved_at).toLocaleString()}</div>
+                ${dateRange}
+                <div class="record-actions">
+                    <button class="btn" onclick="editRecord(${record.id})">✏️ Edit</button>
+                    <button class="btn btn-danger" onclick="deleteRecord(${record.id})">🗑️ Delete</button>
+                    <button class="btn btn-secondary" onclick="viewRecord(${record.id})">👁️ View Details</button>
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+}
+
 function getRecord(id) {
     if (!db) return null;
 
@@ -486,6 +423,7 @@ function editRecord(id) {
         return;
     }
     
+    // Show edit section and populate fields
     document.getElementById('editSection').style.display = 'block';
     document.getElementById('editLocation').value = record.location || '';
     document.getElementById('editTemperature').value = record.temperature || '';
@@ -494,6 +432,7 @@ function editRecord(id) {
     document.getElementById('editWindSpeed').value = record.wind_speed || '';
     document.getElementById('editPressure').value = record.pressure || '';
     
+    // Handle icon selector
     let iconContainer = document.getElementById('editIconContainer');
     if (!iconContainer) {
         const pressureGroup = document.getElementById('editPressure').parentElement;
@@ -512,6 +451,7 @@ function editRecord(id) {
         iconContainer.innerHTML = createIconSelector(currentIconCode);
     }
 
+    // Set date ranges if they exist
     if (record.date_range_start) {
         document.getElementById('editStartDate').value = record.date_range_start;
     }
@@ -522,7 +462,6 @@ function editRecord(id) {
     editingRecordId = id;
     document.getElementById('editSection').scrollIntoView({ behavior: 'smooth' });
 }
-
 
 function updateRecord() {
     if (!editingRecordId || !db) {
@@ -548,38 +487,18 @@ function updateRecord() {
             return;
         }
 
-        const currentRecord = getRecord(editingRecordId);
-        const forecastData = currentRecord ? currentRecord.forecast_data : '[]';
-
         const now = new Date().toISOString();
 
         const updateSQL = `
             UPDATE weather_records SET
-                location = ?,
-                temperature = ?,
-                description = ?,
-                humidity = ?,
-                wind_speed = ?,
-                pressure = ?,
-                icon = ?,
-                date_range_start = ?,
-                date_range_end = ?,
-                saved_at = ?
+                location = ?, temperature = ?, description = ?, humidity = ?, wind_speed = ?,
+                pressure = ?, icon = ?, date_range_start = ?, date_range_end = ?, saved_at = ?
             WHERE id = ?
         `;
 
         db.run(updateSQL, [
-            location,
-            temperature,
-            condition,
-            humidity,
-            windSpeed,
-            pressure,
-            selectedIconCode,
-            startDate || null,
-            endDate || null,
-            now,
-            editingRecordId
+            location, temperature, condition, humidity, windSpeed, pressure,
+            selectedIconCode, startDate || null, endDate || null, now, editingRecordId
         ]);
 
         saveDatabase();
@@ -594,22 +513,15 @@ function updateRecord() {
     }
 }
 
-// Cancel editing
 function cancelEdit() {
     document.getElementById('editSection').style.display = 'none';
     editingRecordId = null;
     
-    document.getElementById('editLocation').value = '';
-    document.getElementById('editTemperature').value = '';
-    document.getElementById('editCondition').value = '';
-    document.getElementById('editHumidity').value = '';
-    document.getElementById('editWindSpeed').value = '';
-    document.getElementById('editPressure').value = '';
-    document.getElementById('editStartDate').value = '';
-    document.getElementById('editEndDate').value = '';
+    // Clear all edit fields
+    const fields = ['editLocation', 'editTemperature', 'editCondition', 'editHumidity', 'editWindSpeed', 'editPressure', 'editStartDate', 'editEndDate'];
+    fields.forEach(field => document.getElementById(field).value = '');
 }
 
-// DELETE - Delete single record
 function deleteRecord(id) {
     if (!db) {
         alert('Database not initialized');
@@ -629,7 +541,6 @@ function deleteRecord(id) {
     }
 }
 
-// View record details
 function viewRecord(id) {
     const record = getRecord(id);
     if (record) {
@@ -657,7 +568,6 @@ function viewRecord(id) {
     }
 }
 
-// DELETE ALL - Clear all records
 function clearRecords() {
     if (!db) {
         alert('Database not initialized');
@@ -677,7 +587,6 @@ function clearRecords() {
     }
 }
 
-// Search records
 function searchRecords() {
     if (!db) return;
 
@@ -710,38 +619,7 @@ function searchRecords() {
         }
         stmt.free();
 
-        const container = document.getElementById('recordsContainer');
-        if (filteredRecords.length === 0) {
-            container.innerHTML = '<p>No records match your search.</p>';
-            return;
-        }
-
-        let html = '';
-        filteredRecords.forEach(record => {
-            const dateRange = record.date_range_start && record.date_range_end 
-                ? `<div>Date Range: ${record.date_range_start} to ${record.date_range_end}</div>` 
-                : '';
-
-            const iconCode = record.icon || '01d';
-            const iconDisplay = `<img src="${getWeatherIconUrl(iconCode)}" alt="weather" style="width: 24px; height: 24px; vertical-align: middle;" onerror="this.src='${getWeatherIconUrl('01d')}'">`;
-
-            html += `
-                <div class="record-item">
-                    <div><strong>${iconDisplay} ${record.location}</strong></div>
-                    <div>Temperature: ${record.temperature}°C</div>
-                    <div>Condition: ${record.description}</div>
-                    <div>Saved: ${new Date(record.saved_at).toLocaleString()}</div>
-                    ${dateRange}
-                    <div class="record-actions">
-                        <button class="btn" onclick="editRecord(${record.id})">✏️ Edit</button>
-                        <button class="btn btn-danger" onclick="deleteRecord(${record.id})">🗑️ Delete</button>
-                        <button class="btn btn-secondary" onclick="viewRecord(${record.id})">👁️ View Details</button>
-                    </div>
-                </div>
-            `;
-        });
-
-        container.innerHTML = html;
+        displayRecords(filteredRecords);
 
     } catch (error) {
         console.error('Error searching records:', error);
@@ -749,7 +627,7 @@ function searchRecords() {
     }
 }
 
-// Export Functions
+// Export functions
 function exportData(format) {
     if (!db) {
         alert('Database not initialized');
@@ -757,7 +635,6 @@ function exportData(format) {
     }
 
     try {
-        // Get all records for export
         const selectSQL = `SELECT * FROM weather_records ORDER BY created_at DESC`;
         const stmt = db.prepare(selectSQL);
         const records = [];
@@ -774,133 +651,19 @@ function exportData(format) {
             return;
         }
 
-        let content = '';
-        let filename = `weather_data_${new Date().toISOString().split('T')[0]}`;
-        let mimeType = 'text/plain';
+        const exporters = {
+            json: () => exportJSON(records),
+            csv: () => exportCSV(records),
+            xml: () => exportXML(records),
+            markdown: () => exportMarkdown(records),
+            pdf: () => exportPDF(records)
+        };
 
-        switch (format) {
-            case 'json':
-                content = JSON.stringify(records, null, 2);
-                filename += '.json';
-                mimeType = 'application/json';
-                break;
-
-            case 'csv':
-                content = 'ID,Location,Temperature,Condition,Humidity,Wind Speed,Pressure,Date Range Start,Date Range End,Saved At\n';
-                records.forEach(record => {
-                    content += `${record.id},"${record.location}",${record.temperature},"${record.description}",${record.humidity},${record.wind_speed},${record.pressure},"${record.date_range_start || ''}","${record.date_range_end || ''}","${record.saved_at}"\n`;
-                });
-                filename += '.csv';
-                mimeType = 'text/csv';
-                break;
-
-            case 'xml':
-                content = '<?xml version="1.0" encoding="UTF-8"?>\n<weather_records>\n';
-                records.forEach(record => {
-                    content += `  <record id="${record.id}">\n`;
-                    content += `    <location>${record.location}</location>\n`;
-                    content += `    <temperature>${record.temperature}</temperature>\n`;
-                    content += `    <condition>${record.description}</condition>\n`;
-                    content += `    <humidity>${record.humidity}</humidity>\n`;
-                    content += `    <wind_speed>${record.wind_speed}</wind_speed>\n`;
-                    content += `    <pressure>${record.pressure}</pressure>\n`;
-                    if (record.date_range_start && record.date_range_end) {
-                        content += `    <date_range>\n`;
-                        content += `      <start>${record.date_range_start}</start>\n`;
-                        content += `      <end>${record.date_range_end}</end>\n`;
-                        content += `    </date_range>\n`;
-                    }
-                    content += `    <saved_at>${record.saved_at}</saved_at>\n`;
-                    content += `  </record>\n`;
-                });
-                content += '</weather_records>';
-                filename += '.xml';
-                mimeType = 'application/xml';
-                break;
-
-            case 'markdown':
-                content = '# Weather Data Export\n\n';
-                content += `Generated on: ${new Date().toLocaleString()}\n\n`;
-                records.forEach((record, index) => {
-                    content += `## Record ${index + 1}: ${record.location}\n\n`;
-                    content += `- **Temperature:** ${record.temperature}°C\n`;
-                    content += `- **Condition:** ${record.description}\n`;
-                    content += `- **Humidity:** ${record.humidity}%\n`;
-                    content += `- **Wind Speed:** ${record.wind_speed} km/h\n`;
-                    content += `- **Pressure:** ${record.pressure} hPa\n`;
-                    if (record.date_range_start && record.date_range_end) {
-                        content += `- **Date Range:** ${record.date_range_start} to ${record.date_range_end}\n`;
-                    }
-                    content += `- **Saved At:** ${new Date(record.saved_at).toLocaleString()}\n\n`;
-                });
-                filename += '.md';
-                mimeType = 'text/markdown';
-                break;
-
-            case 'pdf':
-                const { jsPDF } = window.jspdf;
-                const doc = new jsPDF();
-                
-                doc.setFontSize(20);
-                doc.text('Weather Data Export', 20, 20);
-                
-                doc.setFontSize(12);
-                doc.text(`Generated on: ${new Date().toLocaleString()}`, 20, 35);
-                
-                let yPosition = 50;
-                const pageHeight = doc.internal.pageSize.height;
-                const margin = 20;
-                
-                records.forEach((record, index) => {
-                    if (yPosition > pageHeight - 60) {
-                        doc.addPage();
-                        yPosition = 20;
-                    }
-                    
-                    doc.setFontSize(14);
-                    doc.setFont(undefined, 'bold');
-                    doc.text(`Record ${index + 1}: ${record.location}`, margin, yPosition);
-                    yPosition += 10;
-                    
-                    doc.setFontSize(10);
-                    doc.setFont(undefined, 'normal');
-                    
-                    const details = [
-                        `Temperature: ${record.temperature}°C`,
-                        `Condition: ${record.description}`,
-                        `Humidity: ${record.humidity}%`,
-                        `Wind Speed: ${record.wind_speed} km/h`,
-                        `Pressure: ${record.pressure} hPa`
-                    ];
-                    
-                    if (record.date_range_start && record.date_range_end) {
-                        details.push(`Date Range: ${record.date_range_start} to ${record.date_range_end}`);
-                    }
-                    
-                    details.push(`Saved At: ${new Date(record.saved_at).toLocaleString()}`);
-                    
-                    details.forEach(detail => {
-                        doc.text(detail, margin + 5, yPosition);
-                        yPosition += 6;
-                    });
-                    
-                    yPosition += 10;
-                });
-                
-                doc.save(filename + '.pdf');
-                return;
+        if (exporters[format]) {
+            exporters[format]();
+        } else {
+            alert('Unsupported export format');
         }
-
-        // Create and download file
-        const blob = new Blob([content], { type: mimeType });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
 
     } catch (error) {
         console.error('Error exporting data:', error);
@@ -908,7 +671,129 @@ function exportData(format) {
     }
 }
 
-// Close modal when clicking outside of it
+// Individual export functions
+function exportJSON(records) {
+    const content = JSON.stringify(records, null, 2);
+    downloadFile(content, 'application/json', 'json');
+}
+
+function exportCSV(records) {
+    let content = 'ID,Location,Temperature,Condition,Humidity,Wind Speed,Pressure,Date Range Start,Date Range End,Saved At\n';
+    records.forEach(record => {
+        content += `${record.id},"${record.location}",${record.temperature},"${record.description}",${record.humidity},${record.wind_speed},${record.pressure},"${record.date_range_start || ''}","${record.date_range_end || ''}","${record.saved_at}"\n`;
+    });
+    downloadFile(content, 'text/csv', 'csv');
+}
+
+function exportXML(records) {
+    let content = '<?xml version="1.0" encoding="UTF-8"?>\n<weather_records>\n';
+    records.forEach(record => {
+        content += `  <record id="${record.id}">\n`;
+        content += `    <location>${record.location}</location>\n`;
+        content += `    <temperature>${record.temperature}</temperature>\n`;
+        content += `    <condition>${record.description}</condition>\n`;
+        content += `    <humidity>${record.humidity}</humidity>\n`;
+        content += `    <wind_speed>${record.wind_speed}</wind_speed>\n`;
+        content += `    <pressure>${record.pressure}</pressure>\n`;
+        if (record.date_range_start && record.date_range_end) {
+            content += `    <date_range>\n`;
+            content += `      <start>${record.date_range_start}</start>\n`;
+            content += `      <end>${record.date_range_end}</end>\n`;
+            content += `    </date_range>\n`;
+        }
+        content += `    <saved_at>${record.saved_at}</saved_at>\n`;
+        content += `  </record>\n`;
+    });
+    content += '</weather_records>';
+    downloadFile(content, 'application/xml', 'xml');
+}
+
+function exportMarkdown(records) {
+    let content = '# Weather Data Export\n\n';
+    content += `Generated on: ${new Date().toLocaleString()}\n\n`;
+    records.forEach((record, index) => {
+        content += `## Record ${index + 1}: ${record.location}\n\n`;
+        content += `- **Temperature:** ${record.temperature}°C\n`;
+        content += `- **Condition:** ${record.description}\n`;
+        content += `- **Humidity:** ${record.humidity}%\n`;
+        content += `- **Wind Speed:** ${record.wind_speed} km/h\n`;
+        content += `- **Pressure:** ${record.pressure} hPa\n`;
+        if (record.date_range_start && record.date_range_end) {
+            content += `- **Date Range:** ${record.date_range_start} to ${record.date_range_end}\n`;
+        }
+        content += `- **Saved At:** ${new Date(record.saved_at).toLocaleString()}\n\n`;
+    });
+    downloadFile(content, 'text/markdown', 'md');
+}
+
+function exportPDF(records) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    doc.setFontSize(20);
+    doc.text('Weather Data Export', 20, 20);
+    
+    doc.setFontSize(12);
+    doc.text(`Generated on: ${new Date().toLocaleString()}`, 20, 35);
+    
+    let yPosition = 50;
+    const pageHeight = doc.internal.pageSize.height;
+    const margin = 20;
+    
+    records.forEach((record, index) => {
+        if (yPosition > pageHeight - 60) {
+            doc.addPage();
+            yPosition = 20;
+        }
+        
+        doc.setFontSize(14);
+        doc.setFont(undefined, 'bold');
+        doc.text(`Record ${index + 1}: ${record.location}`, margin, yPosition);
+        yPosition += 10;
+        
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'normal');
+        
+        const details = [
+            `Temperature: ${record.temperature}°C`,
+            `Condition: ${record.description}`,
+            `Humidity: ${record.humidity}%`,
+            `Wind Speed: ${record.wind_speed} km/h`,
+            `Pressure: ${record.pressure} hPa`
+        ];
+        
+        if (record.date_range_start && record.date_range_end) {
+            details.push(`Date Range: ${record.date_range_start} to ${record.date_range_end}`);
+        }
+        
+        details.push(`Saved At: ${new Date(record.saved_at).toLocaleString()}`);
+        
+        details.forEach(detail => {
+            doc.text(detail, margin + 5, yPosition);
+            yPosition += 6;
+        });
+        
+        yPosition += 10;
+    });
+    
+    doc.save(`weather_data_${new Date().toISOString().split('T')[0]}.pdf`);
+}
+
+// Helper function for file downloads
+function downloadFile(content, mimeType, extension) {
+    const filename = `weather_data_${new Date().toISOString().split('T')[0]}.${extension}`;
+    const blob = new Blob([content], { type: mimeType });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+}
+
+// Modal event handler
 window.onclick = function(event) {
     const modal = document.getElementById('infoModal');
     if (event.target == modal) {
